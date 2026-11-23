@@ -1,53 +1,59 @@
+import json
+import os
+import uuid
 from datetime import datetime, timezone
-from uuid import uuid4
+from functools import cache
+from pathlib import Path
 
-from fastapi import HTTPException
-from pymongo import DESCENDING
-from shared.contracts import PredictionRequest, PredictionResponse, get_target_comparison
-from ml.inference import get_active_model_metadata, predict_productivity
-from backend.app.database import get_db, ensure_indexes
-
-PUBLIC = {key: 1 for key in PredictionResponse.model_fields}
-PUBLIC["_id"] = 0
+from backend.app.database import get_db                     # SESUAIKAN: cek nama fungsinya
+from shared.contracts import PredictionRequest              # SESUAIKAN: cek nama kelasnya
+from ml.inference import predict_productivity               # SESUAIKAN: cek nama fungsi Barra
 
 
-def active_model():
-    try:
-        metadata = get_active_model_metadata()
-        if not metadata.get("model_version"):
-            raise ValueError("missing model_version")
-        return metadata
-    except Exception as exc:
-        raise HTTPException(503, "Model atau metadata tidak dapat dimuat.") from exc
+@cache
+def get_model_version() -> str:
+    artifact = Path(os.getenv("MODEL_ARTIFACT_PATH", "ml/artifacts/model.joblib"))
+    meta = json.loads(artifact.with_name("metadata.json").read_text(encoding="utf-8"))
+    return meta["model_version"]                            # SESUAIKAN: key sesuai metadata.json
 
 
-def create_prediction(plan: PredictionRequest):
-    metadata = active_model()
-    try:
-        estimate = predict_productivity(plan)
-    except Exception as exc:
-        raise HTTPException(503, "Inferensi model gagal.") from exc
-    gap, status = get_target_comparison(estimate, plan.target_productivity)
-    result = PredictionResponse(
-        prediction_id=str(uuid4()), created_at=datetime.now(timezone.utc),
-        production_date=plan.production_date, department=plan.department,
-        team_id=plan.team_id, target_productivity=plan.target_productivity,
-        predicted_productivity=estimate, gap_percentage_points=gap,
-        target_status=status, model_version=metadata["model_version"],
+def create_prediction(req: PredictionRequest) -> dict:
+    predicted = float(predict_productivity(req))            # jangan di-clip diam-diam
+    target = req.target_productivity
+    gap = (predicted - target) * 100
+    status = "below_target" if predicted < target else "meets_or_exceeds_target"
+
+    response = {
+        "schema_version": "1.0",
+        "prediction_id": str(uuid.uuid4()),
+        "model_version": get_model_version(),
+        "production_date": req.production_date.isoformat(),
+        "department": req.department.value,
+        "team_id": req.team_id,
+        "target_productivity": target,
+        "predicted_productivity": predicted,
+        "gap_percentage_points": gap,
+        "target_status": status,
+        "prediction_type": "demo_estimate",
+        "created_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+    }
+    # Disimpan: response + input_snapshot. Dikembalikan ke API: response saja.
+    stored = {**response, "input_snapshot": req.model_dump(mode="json")}
+    get_db().predictions.insert_one(stored)   # insert_one menambah _id ke `stored`, bukan ke `response`
+    return response
+
+
+def get_prediction_by_id(prediction_id: str, include_snapshot: bool = False) -> dict | None:
+    projection = {"_id": 0} if include_snapshot else {"_id": 0, "input_snapshot": 0}
+    return get_db().predictions.find_one({"prediction_id": prediction_id}, projection)
+
+
+def list_predictions(limit: int = 20, offset: int = 0) -> dict:
+    limit = max(1, min(limit, 100))
+    offset = max(0, offset)
+    col = get_db().predictions
+    items = list(
+        col.find({}, {"_id": 0, "input_snapshot": 0})
+        .sort("created_at", -1).skip(offset).limit(limit)
     )
-    ensure_indexes()
-    document = result.model_dump(mode="json")
-    document["input_snapshot"] = plan.model_dump(mode="json")
-    get_db().predictions.insert_one(document)
-    return result
-
-
-def get_prediction_by_id(prediction_id):
-    return get_db().predictions.find_one({"prediction_id": prediction_id}, PUBLIC)
-
-
-def list_saved(limit, offset):
-    collection = get_db().predictions
-    rows = collection.find({}, PUBLIC).sort([("created_at", DESCENDING), ("prediction_id", DESCENDING)])
-    return dict(items=list(rows.skip(offset).limit(limit)), total=collection.count_documents({}),
-                limit=limit, offset=offset)
+    return {"items": items, "total": col.count_documents({}), "limit": limit, "offset": offset}

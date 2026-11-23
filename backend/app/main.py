@@ -1,14 +1,14 @@
 from pathlib import Path
+from fastapi import FastAPI
+from pymongo import MongoClient
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException
-from fastapi.responses import JSONResponse
-from pymongo.errors import PyMongoError
+from backend.app.routes import predictions 
+
+load_dotenv()
 
 load_dotenv(Path(__file__).resolve().parents[2] / ".env")
 
-from backend.app.database import get_db
-from backend.app.routes import analytics, chat, metadata, predictions
-from backend.app.services.prediction_service import active_model
+app.include_router(predictions.router) 
 
 app = FastAPI(title="ProdPulse AI")
 for router in (predictions.router, analytics.router, metadata.router, chat.router):
