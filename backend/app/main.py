@@ -2,9 +2,6 @@ import os
 from pathlib import Path
 from fastapi import FastAPI
 from pymongo import MongoClient
-from dotenv import load_dotenv
-
-load_dotenv()
 
 app = FastAPI(title="ProdPulse AI")
 
