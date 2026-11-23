@@ -1,10 +1,3 @@
----
-
-### 3. Pembaruan `docs/experiment_log.md` (Catatan Nomor 1 & 2)
-* Pastikan kamu sudah menjalankan `python -m ml.train` versi terbaru (yang sudah me-*refit* semua model di `train+val`)[cite: 2] lalu salin angka hasil `holdout_test` terbaru dari terminal ke tabel di bawah.
-* Di bagian **Kesimpulan Eksperimen**, kita tambahkan analisis trade-off metrik secara objektif sesuai catatan Faiz nomor 2 (menyebutkan bahwa `ridge-v1` memiliki MAE lebih rendah dibanding `rf-v1` pada *holdout test*, sementara `rf-v1` unggul di RMSE dan R²):
-
-```markdown
 # Log Eksperimen Machine Learning — ProdPulse AI
 
 **Owner:** Barra (`feature/barra-ml`)  
