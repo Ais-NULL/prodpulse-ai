@@ -10,9 +10,9 @@ from __future__ import annotations
 
 from datetime import date, datetime
 from enum import Enum
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 SCHEMA_VERSION = "1.0"
@@ -95,6 +95,113 @@ class OverviewResponse(StrictModel):
     historical_records: int = Field(ge=0)
     prediction_count: int = Field(ge=0)
     mean_historical_productivity: float | None = None
+
+
+# ---------------------------------------------------------------------------
+# Tambahan kontrak v1.0 (additive, tidak mengubah schema yang sudah ada).
+# Wajib direview Rendi (backend), Altaf (frontend), Barra (model info), Ardika.
+# ---------------------------------------------------------------------------
+
+ErrorCode = Literal[
+    "validation_error",
+    "not_found",
+    "model_unavailable",
+    "database_unavailable",
+    "internal_error",
+]
+
+# Pemetaan tunggal kode error -> HTTP status (README bagian 4.3).
+ERROR_HTTP_STATUS: dict[str, int] = {
+    "validation_error": 422,
+    "not_found": 404,
+    "model_unavailable": 503,
+    "database_unavailable": 503,
+    "internal_error": 500,
+}
+
+
+class FieldError(StrictModel):
+    field: str
+    message: str
+
+
+class ErrorResponse(StrictModel):
+    """Format error seragam untuk semua endpoint /api/v1 dan /health."""
+
+    code: ErrorCode
+    message: str
+    fields: list[FieldError] = Field(default_factory=list)
+
+
+class HealthResponse(StrictModel):
+    """GET /health. Nilai "mock" berarti komponen belum nyata (Sprint 0)."""
+
+    status: Literal["ok", "degraded"]
+    db_status: Literal["ok", "unavailable", "mock"]
+    model_status: Literal["ok", "unavailable", "mock"]
+
+
+class ModelMetrics(StrictModel):
+    """Metrik validasi dalam satuan rasio. null = belum ada (jangan dikarang)."""
+
+    mae: float | None = None
+    rmse: float | None = None
+    r2: float | None = None
+
+
+class ActiveModelResponse(StrictModel):
+    """GET /api/v1/models/active."""
+
+    schema_version: Literal["1.0"] = SCHEMA_VERSION
+    model_version: str = Field(min_length=1)
+    feature_names: list[str]
+    metrics: ModelMetrics | None = None
+    training_cutoff: date | None = None
+
+    @model_validator(mode="after")
+    def _features_match_contract(self) -> "ActiveModelResponse":
+        if tuple(self.feature_names) != MODEL_FEATURE_NAMES:
+            raise ValueError(
+                "feature_names harus sama persis dengan MODEL_FEATURE_NAMES"
+            )
+        return self
+
+
+class MetaOptionsResponse(StrictModel):
+    """GET /api/v1/meta/options (sumber dropdown form)."""
+
+    departments: list[Department] = Field(min_length=1)
+    team_ids: list[Annotated[int, Field(ge=1)]] = Field(min_length=1)
+
+
+class TeamAnalyticsItem(StrictModel):
+    department: Department
+    team_id: int = Field(ge=1)
+    record_count: int = Field(ge=0)
+    mean_actual_productivity: float | None = None
+    mean_target_productivity: float | None = None
+
+
+class TeamAnalyticsResponse(StrictModel):
+    """GET /api/v1/analytics/teams. Selalu data historis, bukan prediksi."""
+
+    data_label: Literal["historical_dataset"] = "historical_dataset"
+    items: list[TeamAnalyticsItem]
+
+
+class ActualRequest(StrictModel):
+    """POST /api/v1/actuals (fase 2). Nilai > 1 diperbolehkan (data UCI)."""
+
+    prediction_id: str = Field(min_length=1)
+    actual_productivity: float = Field(ge=0)
+    recorded_at: datetime | None = None
+
+
+class ActualResponse(StrictModel):
+    prediction_id: str = Field(min_length=1)
+    actual_productivity: float = Field(ge=0)
+    recorded_at: datetime
+    data_source: Literal["user_entered"] = "user_entered"
 
 
 def get_target_comparison(predicted: float, target: float) -> tuple[float, TargetStatus]:
