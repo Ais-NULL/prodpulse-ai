@@ -9,6 +9,7 @@ import joblib
 import numpy as np
 import pandas as pd
 import sklearn
+from sklearn.base import clone
 from sklearn.dummy import DummyRegressor
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.linear_model import Ridge
@@ -70,7 +71,7 @@ def chronological_date_split(
 
 
 def train_and_select_model(csv_path: Path = RAW_CSV_PATH) -> dict:
-    """Melatih baseline & kandidat regresi, mengevaluasi pada holdout, dan ekspor artefak."""
+    """Melatih baseline & kandidat regresi, mengevaluasi secara adil pada holdout, dan ekspor artefak."""
     df = load_and_normalize_dataset(csv_path)
     train_df, val_df, test_df = chronological_date_split(df)
 
@@ -82,6 +83,10 @@ def train_and_select_model(csv_path: Path = RAW_CSV_PATH) -> dict:
 
     X_test = prepare_training_dataframe(test_df)
     y_test = test_df["actual_productivity"].to_numpy(dtype=float)
+
+    train_val_df = pd.concat([train_df, val_df], ignore_index=True)
+    X_train_val = prepare_training_dataframe(train_val_df)
+    y_train_val = train_val_df["actual_productivity"].to_numpy(dtype=float)
 
     candidates = {
         "dummy-mean-v1": DummyRegressor(strategy="mean"),
@@ -96,44 +101,41 @@ def train_and_select_model(csv_path: Path = RAW_CSV_PATH) -> dict:
     }
 
     results = {}
-    fitted_pipelines = {}
+    refitted_pipelines = {}
 
     for name, estimator in candidates.items():
-        pipe = Pipeline(
+        # 1. Fit di train saja untuk seleksi model pada validation
+        val_pipe = Pipeline(
             steps=[
                 ("preprocessor", build_preprocessor()),
-                ("regressor", estimator),
+                ("regressor", clone(estimator)),
             ]
         )
-        pipe.fit(X_train, y_train)
-        val_preds = pipe.predict(X_val)
+        val_pipe.fit(X_train, y_train)
+        val_preds = val_pipe.predict(X_val)
         val_metrics = evaluate_regression(y_val, val_preds)
 
-        results[name] = {"validation": val_metrics}
-        fitted_pipelines[name] = pipe
+        # 2. Refit semua model di train+val untuk evaluasi holdout_test yang adil
+        holdout_pipe = Pipeline(
+            steps=[
+                ("preprocessor", build_preprocessor()),
+                ("regressor", clone(estimator)),
+            ]
+        )
+        holdout_pipe.fit(X_train_val, y_train_val)
+        test_preds = holdout_pipe.predict(X_test)
+        test_metrics = evaluate_regression(y_test, test_preds)
 
-    # Pilih kandidat ML utama berdasarkan validation RMSE terendah (antara ridge-v1 dan rf-v1)
+        results[name] = {
+            "validation": val_metrics,
+            "holdout_test": test_metrics,
+        }
+        refitted_pipelines[name] = holdout_pipe
+
+    # Pilih kandidat ML utama berdasarkan validation RMSE terendah
     ml_candidates = ["ridge-v1", "rf-v1"]
     best_model_name = min(ml_candidates, key=lambda m: results[m]["validation"]["rmse"])
-
-    # Latih ulang model terpilih pada gabungan train + val sebelum evaluasi final di holdout test
-    train_val_df = pd.concat([train_df, val_df], ignore_index=True)
-    X_train_val = prepare_training_dataframe(train_val_df)
-    y_train_val = train_val_df["actual_productivity"].to_numpy(dtype=float)
-
-    final_pipeline = Pipeline(
-        steps=[
-            ("preprocessor", build_preprocessor()),
-            ("regressor", candidates[best_model_name]),
-        ]
-    )
-    final_pipeline.fit(X_train_val, y_train_val)
-
-    # Evaluasi semua kandidat di holdout test untuk laporan perbandingan jurnal
-    for name, pipe in fitted_pipelines.items():
-        eval_pipe = final_pipeline if name == best_model_name else pipe
-        test_preds = eval_pipe.predict(X_test)
-        results[name]["holdout_test"] = evaluate_regression(y_test, test_preds)
+    final_pipeline = refitted_pipelines[best_model_name]
 
     ARTIFACT_DIR.mkdir(parents=True, exist_ok=True)
     joblib.dump(final_pipeline, MODEL_PATH)

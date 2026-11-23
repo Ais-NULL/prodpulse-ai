@@ -6,7 +6,7 @@
 - **DOI:** https://doi.org/10.24432/C51S6D
 - **Lisensi:** Creative Commons Attribution 4.0 International (CC BY 4.0)
 
-## Aturan Penggunaan di Proyek
-- File CSV mentah (`garments_worker_productivity.csv`) disimpan secara lokal di folder `data/` dan tidak di-commit ke repository (diabaikan melalui `.gitignore`).
-- Seluruh proses pembersihan dan pemetaan nama kolom wajib menggunakan fungsi tunggal di `shared/normalization.py`.
-- Hanya 6 fitur pre-shift yang digunakan untuk model MVP (`department`, `team_id`, `target_productivity`, `smv_minutes`, `worker_count`, dan `day_of_week`).
+## Cara Menjalankan Training & Menghasilkan Artefak Model
+1. Unduh dataset **Productivity Prediction of Garment Employees** dari tautan UCI di atas, lalu ekstrak dan simpan file CSV mentahnya ke:
+   ```text
+   data/garments_worker_productivity.csv
