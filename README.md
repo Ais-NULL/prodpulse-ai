@@ -380,7 +380,7 @@ prodpulse-ai/
 ### Faiz — System Integrator, Contract Owner & QA Engineer
 
 **Yang dikerjakan:**
-- Menjaga `shared/contracts.py`, `shared/normalization.py`, contoh JSON, `.env.example`, README, dan sinkronisasi API OpenAPI; seluruh anggota memakai source of truth yang sama.
+- Menjaga `shared/contracts.py`, `shared/normalization.py`, contoh JSON, `.env`, README, dan sinkronisasi API OpenAPI; seluruh anggota memakai source of truth yang sama.
 - Menyepakati nama field dan endpoint **sebelum** coding, mengelola perubahan kontrak lewat PR, memastikan ada review dari modul terkait.
 - Membantu Rendi menyediakan mock API/fixtures yang dapat dipakai Altaf dan Ardika sejak Sprint 0; **tidak** menggantikan ownership backend Rendi.
 - Menyiapkan `tests/test_contracts.py`, skenario integrasi, dan tes end-to-end: form Streamlit → FastAPI → inference Barra → MongoDB → riwayat → chatbot Ardika.
@@ -537,7 +537,7 @@ Terminal lain:
 streamlit run frontend/app.py --server.port 8501
 ```
 
-Contoh `.env.example` (**tidak berisi credential**):
+Contoh `.env` (**tidak berisi credential**):
 
 ```ini
 MONGODB_URI=mongodb://localhost:27017
@@ -550,7 +550,7 @@ MODEL_ARTIFACT_PATH=ml/artifacts/model.joblib
 APP_MODE=demo
 ```
 
-**Kontrak integrasi lokal:** API `:8000`, Streamlit `:8501`; connection string harus dari environment, bukan dari source. Jika MongoDB/LLM tidak tersedia, tampilkan status error/degraded yang akurat. Jangan memasukkan password ke README atau `.env.example`.
+**Kontrak integrasi lokal:** API `:8000`, Streamlit `:8501`; connection string harus dari environment, bukan dari source. Jika MongoDB/LLM tidak tersedia, tampilkan status error/degraded yang akurat. Jangan memasukkan password ke README atau `.env`.
 
 ---
 
