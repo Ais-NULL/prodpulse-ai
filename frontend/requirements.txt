@@ -1,0 +1,6 @@
+-c ../requirements.txt
+-r ../requirements-contract.txt
+streamlit>=1.50,<2
+plotly>=5,<7
+requests>=2,<3
+python-dotenv>=1,<2
