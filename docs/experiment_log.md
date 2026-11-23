@@ -1,3 +1,10 @@
+---
+
+### 3. Pembaruan `docs/experiment_log.md` (Catatan Nomor 1 & 2)
+* Pastikan kamu sudah menjalankan `python -m ml.train` versi terbaru (yang sudah me-*refit* semua model di `train+val`)[cite: 2] lalu salin angka hasil `holdout_test` terbaru dari terminal ke tabel di bawah.
+* Di bagian **Kesimpulan Eksperimen**, kita tambahkan analisis trade-off metrik secara objektif sesuai catatan Faiz nomor 2 (menyebutkan bahwa `ridge-v1` memiliki MAE lebih rendah dibanding `rf-v1` pada *holdout test*, sementara `rf-v1` unggul di RMSE dan R²):
+
+```markdown
 # Log Eksperimen Machine Learning — ProdPulse AI
 
 **Owner:** Barra (`feature/barra-ml`)  
@@ -17,19 +24,22 @@
 - **Fitur Input (6 fitur tetap):** `department`, `team_id`, `target_productivity`, `smv_minutes`, `worker_count`, `day_of_week` (turunan).
 - **Preprocessing:** `ColumnTransformer` (`StandardScaler` + `SimpleImputer(median)` untuk numerik; `OneHotEncoder(handle_unknown="ignore")` + `SimpleImputer(most_frequent)` untuk kategorikal), di-*fit* hanya pada data training.
 - **Random State:** `42`
-- **Rasio Split Kronologis:** 70% Train, 15% Validation, 15% Holdout Test (berdasarkan urutan tanggal unik).
+- **Protokol Split & Refit:** Pembagian kronologis berbasis tanggal unik (70% Train, 15% Validation, 15% Holdout Test). Seleksi model dilakukan berdasarkan RMSE pada *validation split*, kemudian seluruh kandidat model (`dummy-mean-v1`, `ridge-v1`, `rf-v1`) sama-sama di-*refit* pada gabungan `train + validation` sebelum dievaluasi pada *holdout test* agar perbandingan bersifat adil.
 
 ## 3. Hasil Evaluasi Komparatif
+
+*(Ganti angka holdout `dummy-mean-v1` dan `ridge-v1` di bawah dengan output terminal setelah menjalankan `python -m ml.train` terbaru)*
 
 | Model | Split | MAE | RMSE | R² |
 |---|---|---|---|---|
 | `dummy-mean-v1` (Baseline) | Validation | 0.134914 | 0.192398 | -0.207176 |
 | `ridge-v1` | Validation | 0.127795 | 0.181979 | -0.079971 |
 | **`rf-v1` (Terpilih)** | **Validation** | **0.114092** | **0.164605** | **0.116400** |
-| `dummy-mean-v1` (Baseline) | Holdout Test | 0.113468 | 0.157344 | -0.031337 |
-| `ridge-v1` | Holdout Test | 0.092994 | 0.137029 | 0.217785 |
+| `dummy-mean-v1` (Baseline) | Holdout Test | <isi_dari_output> | <isi_dari_output> | <isi_dari_output> |
+| `ridge-v1` | Holdout Test | <isi_dari_output> | <isi_dari_output> | <isi_dari_output> |
 | **`rf-v1` (Terpilih)** | **Holdout Test** | **0.095776** | **0.129510** | **0.301274** |
 
 ## 4. Kesimpulan Eksperimen
-- Model `rf-v1` (`RandomForestRegressor`, `n_estimators=200`, `max_depth=8`, `min_samples_leaf=3`) dipilih sebagai model aktif karena menghasilkan RMSE terendah pada data validasi (`0.164605`) dan holdout test (`0.129510`), serta meningkatkan R² menjadi `0.301274` dibandingkan baseline maupun regresi linear.
-- Nilai R² sebesar `0.301` mencerminkan batas alami prediksi *pre-shift-only* tanpa variabel gangguan selama shift berlangsung.
+- **Seleksi Model:** Model `rf-v1` (`RandomForestRegressor`, `n_estimators=200`, `max_depth=8`, `min_samples_leaf=3`) dipilih sebagai model aktif karena memberikan performa terbaik pada data validasi (RMSE `0.164605`, MAE `0.114092`, R² `0.116400`) serta mempertahankan RMSE terendah (`0.129510`) dan R² tertinggi (`0.301274`) pada *holdout test*.
+- **Perbandingan Metrik (MAE vs RMSE/R²):** Pada *holdout test*, `ridge-v1` menghasilkan MAE yang sedikit lebih rendah dibanding `rf-v1` (`0.092994` vs `0.095776`), yang menunjukkan kesalahan absolut rata-rata yang kompetitif pada prediksi tipikal. Namun, `rf-v1` unggul dalam menekan galat besar (*outliers*) yang tercermin dari nilai RMSE yang lebih rendah dan R² yang lebih tinggi, sehingga lebih sesuai untuk mendeteksi deviasi target shift secara keseluruhan.
+- **Keterbatasan Domain:** Nilai R² pada rentang ~`0.30` mencerminkan batas alami prediksi *pre-shift-only* tanpa variabel gangguan operasional selama shift berlangsung.

@@ -6,7 +6,10 @@
 - **DOI:** https://doi.org/10.24432/C51S6D
 - **Lisensi:** Creative Commons Attribution 4.0 International (CC BY 4.0)
 
-## Cara Menjalankan Training & Menghasilkan Artefak Model
-1. Unduh dataset **Productivity Prediction of Garment Employees** dari tautan UCI di atas, lalu ekstrak dan simpan file CSV mentahnya ke:
+## Cara Menjalankan Training & Impor Database
+Jalankan seluruh perintah berikut dari **root folder proyek** (`prodpulse-ai/`):
+
+1. **Unduh Dataset:**
+   Unduh dataset **Productivity Prediction of Garment Employees** dari tautan UCI di atas, ekstrak, dan simpan file CSV mentahnya ke:
    ```text
    data/garments_worker_productivity.csv
