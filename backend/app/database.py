@@ -1,12 +1,16 @@
 import os
+from dotenv import load_dotenv
 from pymongo import MongoClient, ASCENDING, DESCENDING
+
+load_dotenv()
 
 _client = None
 
 def get_db():
     global _client
     if _client is None:
-        _client = MongoClient(os.environ["MONGODB_URI"], serverSelectionTimeoutMS=3000)
+        uri = os.getenv("MONGODB_URI", "mongodb://localhost:27017")
+        _client = MongoClient(uri, serverSelectionTimeoutMS=3000)
     return _client[os.getenv("MONGODB_DB_NAME", "prodpulse_ai")]
 
 def ensure_indexes():

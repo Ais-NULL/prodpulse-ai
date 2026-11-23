@@ -3,11 +3,13 @@ from pathlib import Path
 from fastapi import FastAPI
 from pymongo import MongoClient
 from dotenv import load_dotenv
+from backend.app.routes import predictions 
 
 load_dotenv()
 
 app = FastAPI(title="ProdPulse AI")
 
+app.include_router(predictions.router) 
 
 def check_db() -> str:
     try:
