@@ -18,21 +18,24 @@ _cached_metadata = None
 
 
 def load_model_bundle(
-    model_path: Path = DEFAULT_ARTIFACT_PATH,
-    metadata_path: Path = DEFAULT_METADATA_PATH,
+    model_path: Path | None = None,
+    metadata_path: Path | None = None,
 ):
     """Memuat model dan metadata ke memori (lazy loading)."""
     global _cached_model, _cached_metadata
+    resolved_model_path = model_path or DEFAULT_ARTIFACT_PATH
+    resolved_metadata_path = metadata_path or DEFAULT_METADATA_PATH
+
     if _cached_model is None:
-        if not model_path.exists():
+        if not resolved_model_path.exists():
             raise FileNotFoundError(
-                f"Artefak model tidak ditemukan di {model_path}. "
+                f"Artefak model tidak ditemukan di {resolved_model_path}. "
                 "Jalankan `python -m ml.train` terlebih dahulu."
             )
-        _cached_model = joblib.load(model_path)
+        _cached_model = joblib.load(resolved_model_path)
 
-    if _cached_metadata is None and metadata_path.exists():
-        with open(metadata_path, "r", encoding="utf-8") as f:
+    if _cached_metadata is None and resolved_metadata_path.exists():
+        with open(resolved_metadata_path, "r", encoding="utf-8") as f:
             _cached_metadata = json.load(f)
 
     return _cached_model, _cached_metadata

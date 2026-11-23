@@ -21,18 +21,16 @@
 
 ## 3. Hasil Evaluasi Komparatif
 
-*(Ganti angka holdout `dummy-mean-v1` dan `ridge-v1` di bawah dengan output terminal setelah menjalankan `python -m ml.train` terbaru)*
-
 | Model | Split | MAE | RMSE | R² |
 |---|---|---|---|---|
 | `dummy-mean-v1` (Baseline) | Validation | 0.134914 | 0.192398 | -0.207176 |
 | `ridge-v1` | Validation | 0.127795 | 0.181979 | -0.079971 |
 | **`rf-v1` (Terpilih)** | **Validation** | **0.114092** | **0.164605** | **0.116400** |
-| `dummy-mean-v1` (Baseline) | Holdout Test | <isi_dari_output> | <isi_dari_output> | <isi_dari_output> |
-| `ridge-v1` | Holdout Test | <isi_dari_output> | <isi_dari_output> | <isi_dari_output> |
+| `dummy-mean-v1` (Baseline) | Holdout Test | 0.116372 | 0.155479 | -0.007032 |
+| `ridge-v1` | Holdout Test | 0.089670 | 0.132066 | 0.273424 |
 | **`rf-v1` (Terpilih)** | **Holdout Test** | **0.095776** | **0.129510** | **0.301274** |
 
 ## 4. Kesimpulan Eksperimen
 - **Seleksi Model:** Model `rf-v1` (`RandomForestRegressor`, `n_estimators=200`, `max_depth=8`, `min_samples_leaf=3`) dipilih sebagai model aktif karena memberikan performa terbaik pada data validasi (RMSE `0.164605`, MAE `0.114092`, R² `0.116400`) serta mempertahankan RMSE terendah (`0.129510`) dan R² tertinggi (`0.301274`) pada *holdout test*.
-- **Perbandingan Metrik (MAE vs RMSE/R²):** Pada *holdout test*, `ridge-v1` menghasilkan MAE yang sedikit lebih rendah dibanding `rf-v1` (`0.092994` vs `0.095776`), yang menunjukkan kesalahan absolut rata-rata yang kompetitif pada prediksi tipikal. Namun, `rf-v1` unggul dalam menekan galat besar (*outliers*) yang tercermin dari nilai RMSE yang lebih rendah dan R² yang lebih tinggi, sehingga lebih sesuai untuk mendeteksi deviasi target shift secara keseluruhan.
+- **Perbandingan Metrik (MAE vs RMSE/R²):** Setelah *refit* pada `train + validation`, `ridge-v1` menghasilkan MAE yang lebih rendah dibanding `rf-v1` pada *holdout test* (`0.089670` vs `0.095776`), menunjukkan galat absolut rata-rata yang sedikit lebih kecil pada prediksi tipikal. Namun, `rf-v1` unggul dalam menekan galat besar (*outliers*) yang tercermin dari nilai RMSE yang lebih rendah (`0.129510` vs `0.132066`) dan R² yang lebih tinggi (`0.301274` vs `0.273424`), sehingga lebih andal dalam menangkap variasi deviasi target shift.
 - **Keterbatasan Domain:** Nilai R² pada rentang ~`0.30` mencerminkan batas alami prediksi *pre-shift-only* tanpa variabel gangguan operasional selama shift berlangsung.
