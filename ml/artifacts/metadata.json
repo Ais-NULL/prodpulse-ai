@@ -1,0 +1,77 @@
+{
+  "schema_version": "1.0",
+  "model_version": "rf-v1",
+  "feature_names": [
+    "department",
+    "team_id",
+    "target_productivity",
+    "smv_minutes",
+    "worker_count",
+    "day_of_week"
+  ],
+  "random_state": 42,
+  "library_versions": {
+    "scikit_learn": "1.9.1",
+    "pandas": "2.3.3",
+    "numpy": "2.5.5"
+  },
+  "split_summary": {
+    "total_records": 1197,
+    "train_records": 823,
+    "val_records": 182,
+    "test_records": 192,
+    "train_date_range": [
+      "2015-01-01",
+      "2015-02-17"
+    ],
+    "val_date_range": [
+      "2015-02-18",
+      "2015-03-01"
+    ],
+    "test_date_range": [
+      "2015-03-02",
+      "2015-03-11"
+    ]
+  },
+  "metrics": {
+    "dummy-mean-v1": {
+      "validation": {
+        "mae": 0.134914,
+        "rmse": 0.192398,
+        "r2": -0.207176
+      },
+      "holdout_test": {
+        "mae": 0.116372,
+        "rmse": 0.155479,
+        "r2": -0.007032
+      }
+    },
+    "ridge-v1": {
+      "validation": {
+        "mae": 0.127795,
+        "rmse": 0.181979,
+        "r2": -0.079971
+      },
+      "holdout_test": {
+        "mae": 0.08967,
+        "rmse": 0.132066,
+        "r2": 0.273424
+      }
+    },
+    "rf-v1": {
+      "validation": {
+        "mae": 0.114092,
+        "rmse": 0.164605,
+        "r2": 0.1164
+      },
+      "holdout_test": {
+        "mae": 0.095776,
+        "rmse": 0.12951,
+        "r2": 0.301274
+      }
+    }
+  },
+  "training_cutoff": "2015-03-01",
+  "artifact_path": "ml/artifacts/model.joblib",
+  "created_at": "2026-11-23T04:26:32.936452Z"
+}
