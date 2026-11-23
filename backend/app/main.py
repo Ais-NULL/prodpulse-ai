@@ -1,4 +1,3 @@
-import os
 from pathlib import Path
 from fastapi import FastAPI
 from pymongo import MongoClient
@@ -7,33 +6,31 @@ from backend.app.routes import predictions
 
 load_dotenv()
 
-app = FastAPI(title="ProdPulse AI")
+load_dotenv(Path(__file__).resolve().parents[2] / ".env")
 
 app.include_router(predictions.router) 
 
-def check_db() -> str:
-    try:
-        client = MongoClient(
-            os.getenv("MONGODB_URI", "mongodb://localhost:27017"),
-            serverSelectionTimeoutMS=1500,
-        )
-        client.admin.command("ping")
-        return "ok"
-    except Exception:
-        return "unavailable"
+app = FastAPI(title="ProdPulse AI")
+for router in (predictions.router, analytics.router, metadata.router, chat.router):
+    app.include_router(router)
 
 
-def check_model() -> str:
-    path = Path(os.getenv("MODEL_ARTIFACT_PATH", "ml/artifacts/model.joblib"))
-    return "ok" if path.exists() else "unavailable"
+@app.exception_handler(PyMongoError)
+async def database_error(request, exc):
+    return JSONResponse(status_code=503, content={"detail": "MongoDB tidak tersedia atau operasi penyimpanan gagal."})
 
 
 @app.get("/health")
 def health():
-    db = check_db()
-    model = check_model()
-    return {
-        "status": "ok" if db == "ok" and model == "ok" else "degraded",
-        "db_status": db,
-        "model_status": model,
-    }
+    try:
+        get_db().command("ping")
+        db = "ok"
+    except PyMongoError:
+        db = "unavailable"
+    try:
+        active_model()
+        model = "ok"
+    except HTTPException:
+        model = "unavailable"
+    return {"status": "ok" if db == model == "ok" else "degraded",
+            "db_status": db, "model_status": model}
