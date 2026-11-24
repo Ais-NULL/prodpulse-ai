@@ -1,23 +1,42 @@
+from contextlib import asynccontextmanager
 from pathlib import Path
-from fastapi import FastAPI
-from pymongo import MongoClient
-from dotenv import load_dotenv
-from backend.app.routes import predictions 
 
-load_dotenv()
+from dotenv import load_dotenv
+from fastapi import FastAPI, HTTPException
+from fastapi.responses import JSONResponse
+from pymongo.errors import PyMongoError
 
 load_dotenv(Path(__file__).resolve().parents[2] / ".env")
 
-app.include_router(predictions.router) 
+from backend.app.database import ensure_indexes, get_db  # noqa: E402
+from backend.app.routes import analytics, metadata, predictions  # noqa: E402
+from backend.app.services.prediction_service import active_model  # noqa: E402
 
-app = FastAPI(title="ProdPulse AI")
-for router in (predictions.router, analytics.router, metadata.router, chat.router):
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    try:
+        ensure_indexes()
+    except PyMongoError:
+        pass  # MongoDB mati saat start: /health yang melaporkan, jangan crash
+    yield
+
+
+app = FastAPI(title="ProdPulse AI", lifespan=lifespan)
+
+# Route chat berasal dari branch Ardika. Setelah merge, tambahkan:
+#   from backend.app.routes import chat
+#   dan masukkan chat.router ke tuple di bawah.
+for router in (predictions.router, analytics.router, metadata.router):
     app.include_router(router)
 
 
 @app.exception_handler(PyMongoError)
 async def database_error(request, exc):
-    return JSONResponse(status_code=503, content={"detail": "MongoDB tidak tersedia atau operasi penyimpanan gagal."})
+    return JSONResponse(
+        status_code=503,
+        content={"detail": "MongoDB tidak tersedia atau operasi penyimpanan gagal."},
+    )
 
 
 @app.get("/health")
@@ -32,5 +51,8 @@ def health():
         model = "ok"
     except HTTPException:
         model = "unavailable"
-    return {"status": "ok" if db == model == "ok" else "degraded",
-            "db_status": db, "model_status": model}
+    return {
+        "status": "ok" if db == model == "ok" else "degraded",
+        "db_status": db,
+        "model_status": model,
+    }
