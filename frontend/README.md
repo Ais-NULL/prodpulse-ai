@@ -2,6 +2,8 @@
 
 Dashboard Streamlit untuk estimasi produktivitas tim garmen sebelum shift. Setiap halaman menampilkan label **DEMO / Academic Prototype**.
 
+Versi NiceGUI mencakup keempat halaman dan berjalan pada port 8502. Lihat [cara menjalankan NiceGUI](nicegui_app/README.md).
+
 ## Menjalankan aplikasi
 
 Dari root proyek, aktifkan virtual environment Python 3.11+ dan pasang dependensi frontend.
