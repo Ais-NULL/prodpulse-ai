@@ -1,17 +1,16 @@
 from fastapi import APIRouter
-from backend.app.services.analytics_service import overview
-from backend.app.services.prediction_service import active_model
-from shared.contracts import API_PREFIX, OverviewResponse
 
-router = APIRouter(prefix=API_PREFIX)
+from backend.app.services import analytics_service
+from shared.contracts import API_PREFIX
 
-
-@router.get("/analytics/overview", response_model=OverviewResponse)
-def get_overview():
-    return overview()
+router = APIRouter(prefix=f"{API_PREFIX}/analytics", tags=["analytics"])
 
 
-@router.get("/models/active")
-def get_model():
-    meta = active_model()
-    return {k: meta[k] for k in ("model_version", "feature_names", "metrics") if k in meta}
+@router.get("/overview")
+def overview():
+    return analytics_service.overview()
+
+
+@router.get("/teams")
+def teams():
+    return analytics_service.teams_summary()
