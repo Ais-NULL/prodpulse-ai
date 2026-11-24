@@ -8,9 +8,9 @@ from pymongo.errors import PyMongoError
 
 load_dotenv(Path(__file__).resolve().parents[2] / ".env")
 
-from backend.app.database import ensure_indexes, get_db  # noqa: E402
-from backend.app.routes import analytics, metadata, predictions  # noqa: E402
-from backend.app.services.prediction_service import active_model  # noqa: E402
+from backend.app.database import ensure_indexes, get_db  
+from backend.app.routes import analytics, chat, metadata, predictions
+from backend.app.services.prediction_service import active_model  
 
 
 @asynccontextmanager
@@ -27,7 +27,7 @@ app = FastAPI(title="ProdPulse AI", lifespan=lifespan)
 # Route chat berasal dari branch Ardika. Setelah merge, tambahkan:
 #   from backend.app.routes import chat
 #   dan masukkan chat.router ke tuple di bawah.
-for router in (predictions.router, analytics.router, metadata.router):
+for router in (predictions.router, analytics.router, metadata.router, chat.router):
     app.include_router(router)
 
 
