@@ -1,0 +1,6 @@
+-c ../../requirements.txt
+nicegui==3.19.0
+plotly>=6,<7
+pydantic>=2,<3
+requests>=2,<3
+python-dotenv>=1,<2
