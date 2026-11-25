@@ -51,6 +51,12 @@ def result_panel(result: PredictionResponse):
                         f'aria-label="{label}" aria-valuetext="{format_ratio(ratio)}"'
                     ).classes("comparison-bar")
         ui.label("Estimasi model untuk prototipe akademik.").classes("support")
+        with ui.link(target=prediction_url(ASSISTANT, result.prediction_id)).classes("assistant-card"):
+            ui.icon("chat_bubble_outline", size="21px").classes("assistant-card-icon")
+            with ui.column().classes("assistant-card-copy"):
+                ui.label("Bahas hasil dengan AI Assistant").classes("assistant-card-title")
+                ui.label("Tanyakan arti estimasi atau selisih target dengan konteks prediksi ini.").classes("support")
+            ui.icon("arrow_forward", size="19px")
         with ui.expansion("Detail rekaman", icon="info_outline").classes("data-expansion"):
             with ui.element("dl").classes("record-meta"):
                 for label, value in (
@@ -61,7 +67,6 @@ def result_panel(result: PredictionResponse):
                     with ui.element("div"):
                         ui.html(label, tag="dt")
                         ui.html(escape(value), tag="dd")
-        action_link("Bahas dengan AI Assistant", prediction_url(ASSISTANT, result.prediction_id), "chat_bubble_outline")
 
 
 async def prediction_page():
