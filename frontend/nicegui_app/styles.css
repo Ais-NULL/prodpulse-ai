@@ -408,6 +408,37 @@ a:focus-visible, button:focus-visible {
 .comparison-row { display: grid; grid-template-columns: 85px minmax(0, 1fr); align-items: center; gap: 8px; font-size: 13px; }
 .comparison-bar { height: 9px; border-radius: 9px; }
 .result-panel > .support { font-size: 13px; }
+.assistant-card {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 12px;
+    min-height: 64px;
+    padding: 12px;
+    border: 1px solid #d5daf6;
+    border-radius: 12px;
+    background: #f0f1ff;
+    color: var(--accent);
+    text-decoration: none;
+}
+.assistant-card:hover,
+.assistant-card:focus-visible {
+    background: #e7eaff;
+    border-color: #8c95df;
+    text-decoration: none;
+}
+.assistant-card:active { background: #dfe3ff; }
+.assistant-card-icon {
+    display: grid;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    background: #e0e4ff;
+}
+.assistant-card-copy { min-width: 0; gap: 3px; }
+.assistant-card-title { color: #303a9b; font-weight: 680; line-height: 1.35; }
+.assistant-card-copy .support { font-size: 13px; }
 
 .history-toolbar { align-items: center; justify-content: space-between; gap: 8px; }
 .history-toolbar > .support { font-size: 13px; }
