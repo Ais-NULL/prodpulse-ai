@@ -37,7 +37,13 @@ class ApiError(Exception):
 
 def _validation_fields(response: requests.Response) -> tuple[str, ...]:
     try:
-        detail = response.json().get("detail", [])
+        payload = response.json()
+        if isinstance(payload.get("fields"), list):
+            return tuple(dict.fromkeys(
+                item["field"] for item in payload["fields"]
+                if isinstance(item, dict) and isinstance(item.get("field"), str)
+            ))
+        detail = payload.get("detail", [])
     except (ValueError, AttributeError):
         return ()
     if not isinstance(detail, list):

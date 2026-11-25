@@ -47,8 +47,8 @@ def teams_summary() -> dict:
     ])
     items = [{"department": r["_id"]["department"],
               "team_id": r["_id"]["team_id"],
-              "records": r["records"],
-              "mean_actual": r["mean_actual"],
-              "mean_target": r["mean_target"]} for r in rows]
+              "record_count": r["records"],
+              "mean_actual_productivity": r["mean_actual"],
+              "mean_target_productivity": r["mean_target"]} for r in rows]
     items.sort(key=lambda x: (str(x["department"]), x["team_id"]))
     return {"items": items}

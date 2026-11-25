@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
@@ -12,93 +11,14 @@ from pymongo.errors import PyMongoError
 from backend.app.main import app
 
 
-class _InMemoryCollection:
-    """Minimal MongoDB collection double to verify end-to-end persistence."""
-
-    def __init__(self) -> None:
-        self.docs: list[dict] = []
-
-    def insert_one(self, doc: dict):
-        self.docs.append(dict(doc))
-        return SimpleNamespace(inserted_id=doc.get("prediction_id"))
-
-    def find_one(self, query: dict, projection: dict | None = None):
-        for doc in self.docs:
-            if all(doc.get(k) == v for k, v in query.items()):
-                result = dict(doc)
-                if projection and projection.get("_id") == 0:
-                    result.pop("_id", None)
-                return result
-        return None
-
-    def count_documents(self, query: dict) -> int:
-        return sum(1 for d in self.docs if all(d.get(k) == v for k, v in query.items()))
-
-    def find(self, query: dict | None = None, projection: dict | None = None):
-        query = query or {}
-        matched = [
-            dict(d)
-            for d in self.docs
-            if all(d.get(k) == v for k, v in query.items())
-        ]
-        return _InMemoryCursor(matched)
-
-    def create_index(self, *args, **kwargs):
-        return "mock_index"
-
-
-class _InMemoryCursor:
-    def __init__(self, items: list[dict]) -> None:
-        self._items = items
-
-    def sort(self, key: str, direction: int = -1):
-        reverse = direction < 0
-        self._items.sort(key=lambda x: x.get(key, ""), reverse=reverse)
-        return self
-
-    def skip(self, n: int):
-        self._items = self._items[n:]
-        return self
-
-    def limit(self, n: int):
-        self._items = self._items[:n]
-        return self
-
-    def __iter__(self):
-        return iter(self._items)
-
-
-class _FakeDatabase:
-    def __init__(self) -> None:
-        self._collections: dict[str, _InMemoryCollection] = {}
-
-    def __getitem__(self, name: str) -> _InMemoryCollection:
-        if name not in self._collections:
-            self._collections[name] = _InMemoryCollection()
-        return self._collections[name]
-
-    def __getattr__(self, name: str) -> _InMemoryCollection:
-        return self[name]
-
-    def command(self, cmd: str):
-        if cmd == "ping":
-            return {"ok": 1.0}
-        raise ValueError(f"Unsupported command: {cmd}")
-
-
 @pytest.fixture
-def integration_client():
-    fake_db = _FakeDatabase()
-    with (
-        patch("backend.app.main.get_db", return_value=fake_db),
-        patch("backend.app.database.get_db", return_value=fake_db),
-    ):
-        with TestClient(app) as client:
-            yield client, fake_db
+def integration_client(memory_db):
+    with TestClient(app) as client:
+        yield client
 
 
 def test_health_and_active_model_integration(integration_client):
-    client, _ = integration_client
+    client = integration_client
 
     health_res = client.get("/health")
     assert health_res.status_code == 200
@@ -115,7 +35,7 @@ def test_health_and_active_model_integration(integration_client):
 
 
 def test_e2e_prediction_persistence_and_chat_flow(integration_client):
-    client, _ = integration_client
+    client = integration_client
 
     # 1. Buat prediksi nyata lewat POST /api/v1/predictions (FastAPI -> ML Barra -> DB)
     payload = {
@@ -169,12 +89,12 @@ def test_e2e_prediction_persistence_and_chat_flow(integration_client):
         )
     assert chat_res.status_code == 200
     chat_data = chat_res.json()
-    assert chat_data["status"] in {"answered", "unavailable"}
+    assert chat_data["status"] == "unavailable"
     assert "conversation_id" in chat_data
 
 
 def test_validation_error_returns_422(integration_client):
-    client, _ = integration_client
+    client = integration_client
 
     invalid_payload = {
         "production_date": "2026-12-01",
@@ -188,36 +108,29 @@ def test_validation_error_returns_422(integration_client):
     assert res.status_code == 422
 
 
-def test_database_failure_returns_503():
-    import backend.app.services.prediction_service as pred_svc
+def test_database_failure_returns_503(monkeypatch):
+    from backend.app import database
 
-    def _broken_db():
+    def offline(*args, **kwargs):
         raise PyMongoError("Simulated connection failure")
 
-    patches = [
-        patch("backend.app.main.get_db", side_effect=_broken_db),
-        patch("backend.app.database.get_db", side_effect=_broken_db),
-    ]
-    if hasattr(pred_svc, "get_db"):
-        patches.append(patch.object(pred_svc, "get_db", side_effect=_broken_db))
+    monkeypatch.setattr(database, "_client", None)
+    monkeypatch.setattr(database, "MongoClient", offline)
+    with TestClient(app, raise_server_exceptions=False) as client:
+        health_res = client.get("/health")
+        assert health_res.status_code == 200
+        assert health_res.json()["db_status"] == "unavailable"
+        assert health_res.json()["status"] == "degraded"
 
-    with patches[0], patches[1]:
-        ctx = patches[2] if len(patches) > 2 else patch("os.getpid")
-        with ctx, TestClient(app, raise_server_exceptions=False) as client:
-            health_res = client.get("/health")
-            assert health_res.status_code == 200
-            assert health_res.json()["db_status"] == "unavailable"
-            assert health_res.json()["status"] == "degraded"
-
-            res = client.post(
-                "/api/v1/predictions",
-                json={
-                    "production_date": "2026-12-01",
-                    "department": "sewing",
-                    "team_id": 3,
-                    "target_productivity": 0.80,
-                    "smv_minutes": 26.16,
-                    "worker_count": 59.0,
-                },
-            )
-            assert res.status_code == 503
+        res = client.post(
+            "/api/v1/predictions",
+            json={
+                "production_date": "2026-12-01",
+                "department": "sewing",
+                "team_id": 3,
+                "target_productivity": 0.80,
+                "smv_minutes": 26.16,
+                "worker_count": 59.0,
+            },
+        )
+        assert res.status_code == 503
