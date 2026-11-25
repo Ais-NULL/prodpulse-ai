@@ -513,44 +513,85 @@ Catat **fact correctness**, **grounded evidence rate**, **unsupported claim rate
 
 ---
 
-## 11. Instalasi & menjalankan proyek (TARGET setelah implementasi)
+## 11. Instalasi & menjalankan proyek
 
-> Bagian ini adalah **perintah yang direncanakan**. Jangan menganggap proyek siap dijalankan sebelum folder, requirements, server, dan konfigurasi dibuat.
+> Panduan ini sudah diuji untuk menjalankan prototipe di komputer lokal (Windows/PowerShell).
 
-**Prasyarat:** Python versi yang disepakati tim (mis. 3.11), MongoDB lokal/Atlas, akun LLM untuk chatbot (opsional untuk demo tanpa chatbot), Git.
+**Prasyarat:** Python (versi mengikuti kesepakatan tim), Git, MongoDB Atlas atau lokal, dan API key Gemini (hanya untuk AI Assistant).
+
+### 1. Clone dan siapkan environment
 
 ```powershell
-# Dari folder root repo
-py -3.11 -m venv .venv
+git clone https://github.com/Ais-NULL/prodpulse-ai.git
+cd prodpulse-ai
+python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
-Copy-Item .env.example .env
-# Isi variabel lokal (.env tidak di-commit)
-python -m ml.train
+pip install -r frontend/nicegui_app/requirements.txt
+```
+
+### 2. Atur `.env`
+
+```powershell
+Copy-Item env.example .env
+```
+
+Isi nilainya (`.env` **tidak boleh di-commit**):
+
+```ini
+MONGODB_URI=mongodb+srv://<username>:<password>@<cluster>.mongodb.net/
+MONGODB_DB_NAME=prodpulse_ai
+API_BASE_URL=http://localhost:8000
+APP_MODE=demo
+LLM_PROVIDER=gemini
+LLM_MODEL=gemini-3.1-flash-lite
+LLM_API_KEY=isi_api_key_sendiri
+MODEL_ARTIFACT_PATH=ml/artifacts/model.joblib
+```
+
+### 3. Jalankan backend (terminal 1)
+
+```powershell
 uvicorn backend.app.main:app --reload --port 8000
 ```
 
-Terminal lain:
+Cek `http://localhost:8000/docs`. Jika halaman Swagger tampil, backend siap.
+
+### 4. Jalankan frontend (terminal 2)
 
 ```powershell
 .\.venv\Scripts\Activate.ps1
-streamlit run frontend/app.py --server.port 8501
+python -m frontend.nicegui_app
 ```
 
-Contoh `.env` (**tidak berisi credential**):
+Buka `http://127.0.0.1:8502`. Jalankan dari **root repo** dengan flag `-m`; menjalankan `python frontend/nicegui_app/__main__.py` akan gagal dengan `No module named 'frontend'`.
 
-```ini
-MONGODB_URI=mongodb://localhost:27017
-MONGODB_DB_NAME=prodpulse_ai
-API_BASE_URL=http://localhost:8000
-LLM_PROVIDER=configure_me
-LLM_MODEL=configure_me
-LLM_API_KEY=
-MODEL_ARTIFACT_PATH=ml/artifacts/model.joblib
-APP_MODE=demo
-```
+Frontend alternatif (Streamlit): `streamlit run frontend/app.py --server.port 8501`
 
-**Kontrak integrasi lokal:** API `:8000`, Streamlit `:8501`; connection string harus dari environment, bukan dari source. Jika MongoDB/LLM tidak tersedia, tampilkan status error/degraded yang akurat. Jangan memasukkan password ke README atau `.env`.
+### 5. Yang bisa dicoba
+
+| Halaman | Yang dicoba |
+|---|---|
+| Overview | Ringkasan produktivitas historis dan tren estimasi |
+| Prediksi baru | Isi rencana produksi, *Buat estimasi*, lalu *Simpan draf sesi* |
+| Riwayat prediksi | Filter Sewing/Finishing, buka *Lihat detail* |
+| AI Assistant | Tanyakan arti selisih terhadap target |
+
+### 6. Masalah umum
+
+| Gejala | Solusi |
+|---|---|
+| `No module named 'frontend'` | Jalankan `python -m frontend.nicegui_app` dari root repo |
+| `Could not import module "backend.main"` | Gunakan `backend.app.main:app` |
+| `missing ScriptRunContext` | Streamlit harus dijalankan dengan `streamlit run`, bukan `python` |
+| Data kosong | Pastikan backend nyala, `API_BASE_URL` dan `MONGODB_URI` benar |
+| Chatbot tidak membalas | Periksa `LLM_API_KEY` |
+
+### 7. Memberi masukan
+
+Buka [Issues](https://github.com/Ais-NULL/prodpulse-ai/issues) dan sertakan: halaman yang dicoba, langkah yang dilakukan, hasil yang diharapkan vs sebenarnya, serta screenshot atau pesan error (**jangan** sertakan API key atau password).
+
+**Kontrak integrasi lokal:** API `:8000`, NiceGUI `:8502`, Streamlit `:8501`. Connection string harus dari environment, bukan dari source.
 
 ---
 
