@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 
 from shared.contracts import PredictionRequest, PredictionResponse, PredictionListResponse
 from backend.app.services import prediction_service
@@ -23,5 +23,5 @@ def get_prediction(prediction_id: str):
 
 
 @router.get("", response_model=PredictionListResponse)
-def list_predictions(limit: int = 20, offset: int = 0):
+def list_predictions(limit: int = Query(20, ge=1, le=100), offset: int = Query(0, ge=0)):
     return prediction_service.list_predictions(limit=limit, offset=offset)

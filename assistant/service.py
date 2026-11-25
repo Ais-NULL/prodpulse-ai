@@ -1,25 +1,46 @@
 from uuid import uuid4
+
 from shared.contracts import ChatRequest, ChatResponse, EvidenceRef, PredictionResponse
 from .gemini import ProviderUnavailable, select_topics
 
 
+def number_id(value: float) -> str:
+    return f"{value:.2f}".rstrip("0").rstrip(".").replace(".", ",")
+
+
+def target_summary(record: dict, team: str, date_label: str) -> str:
+    estimate = number_id(record["predicted_productivity"] * 100)
+    target = number_id(record["target_productivity"] * 100)
+    gap = record["gap_percentage_points"]
+    if gap == 0:
+        return f"{team} diperkirakan tepat mencapai target {target}% pada {date_label}."
+    direction = "di bawah" if gap < 0 else "di atas"
+    size = number_id(abs(gap))
+    if size == "0":
+        size = "kurang dari 0,01"
+    return (
+        f"Produktivitas {team} pada {date_label} diperkirakan {estimate}%. "
+        f"Dengan target {target}%, estimasinya {size} poin persentase {direction} target."
+    )
+
+
 def chat(request: ChatRequest, *, get_prediction_by_id, classify=select_topics, get_team_history_summary=None) -> ChatResponse:
-    """Reader tepercaya mengembalikan PredictionResponse, mapping v1 atau None."""
+    """Read the selected prediction and cite the facts used in each reply."""
     result = ChatResponse(conversation_id=request.conversation_id or str(uuid4()),
                           answer="", status="insufficient_data")
     prediction_id = request.prediction_id
     if not request.message.strip():
-        result.answer = "Isi pertanyaan terlebih dahulu."
+        result.answer = "Tulis pertanyaan tentang prediksi tim yang ingin Anda bahas."
         return result
     if not prediction_id:
-        result.answer = "Pilih satu prediksi dulu supaya saya bisa membaca datanya."
+        result.answer = "Pilih satu prediksi di halaman Riwayat, lalu tanyakan estimasi atau selisihnya dari target."
         return result
-    record = get_prediction_by_id(str(prediction_id))
+    record = get_prediction_by_id(prediction_id)
     if record is None:
-        result.answer = "Prediksi dengan ID tersebut belum ditemukan."
+        result.answer = "Prediksi ini belum ditemukan. Pilih kembali prediksi yang ingin dibahas di halaman Riwayat."
         return result
-    record = PredictionResponse.model_validate(record).model_dump(mode="json")
-    if str(record["prediction_id"]) != str(prediction_id):
+    prediction = PredictionResponse.model_validate(record)
+    if prediction.prediction_id != prediction_id:
         raise ValueError("ID sumber berbeda dari prediksi yang diminta.")
     try:
         topics = classify(request.message.strip())
@@ -28,48 +49,44 @@ def chat(request: ChatRequest, *, get_prediction_by_id, classify=select_topics, 
         result.answer = str(error)
         return result
     if "unsupported" in topics:
-        result.answer = "Saya bisa menjelaskan estimasi, target dan versi model pada prediksi yang dipilih."
+        result.answer = "Untuk prediksi ini, Anda bisa menanyakan estimasi, target, versi model, atau rata-rata produktivitas tim di data UCI."
         return result
     if "individual" in topics:
-        result.answer = "Data tersedia pada tingkat tim. Penilaian pekerja individu tidak tersedia."
+        result.answer = "Catatan ini merangkum hasil satu tim. Untuk menilai seorang pekerja, diperlukan data per orang."
         return result
 
-    sentences = []
+    record = prediction.model_dump(mode="json")
+    team = f"Tim {record['team_id']} ({record['department'].capitalize()})"
+    date_label = prediction.production_date.strftime("%d/%m/%Y")
+    paragraphs = []
     if "target" in topics:
-        gap = record["gap_percentage_points"]
-        if gap == 0:
-            comparison = "tepat sesuai target"
-        else:
-            direction = "di bawah" if gap < 0 else "di atas"
-            comparison = f"{round(abs(gap), 2)} poin persentase {direction} target"
-        sentences.append(
-            f"Estimasi Tim {record['team_id']} ({record['department']}) pada {record['production_date']} "
-            f"sebesar {round(record['predicted_productivity'] * 100, 2)}% dengan target "
-            f"{round(record['target_productivity'] * 100, 2)}%, {comparison}."
-        )
+        paragraphs.append(target_summary(record, team, date_label))
     if "actual" in topics:
-        sentences.append("Catatan ini berisi estimasi sebelum shift. Realisasi shift belum tersedia di sini.")
+        paragraphs.append("Perkiraan ini dibuat sebelum shift. Produktivitas aktual untuk shift tersebut belum tercatat di prediksi ini.")
     if "cause" in topics:
-        sentences.append("Catatan prediksi ini belum menyediakan bukti penyebab selisih atau dampak perubahan rencana.")
+        paragraphs.append("Dari prediksi ini saja, penyebab selisih dan dampak mengubah rencana kerja belum bisa dipastikan.")
     if "model" in topics:
-        sentences.append(f"Versi model pada prediksi ini adalah {record['model_version']}. "
-                         "Catatan prediksi ini memuat versi model.")
-    history_ref = None
+        paragraphs.append(f"Model yang digunakan untuk prediksi ini adalah {prediction.model_version}.")
+    cites_prediction = any(t in topics for t in ("target", "actual", "cause", "model"))
+    if cites_prediction:
+        result.evidence.append(EvidenceRef(type="prediction", id=prediction_id))
     if "history" in topics:
         summary = get_team_history_summary(record) if get_team_history_summary else None
         if summary and summary["mean"] is not None:
-            scope = f"Tim {record['team_id']} {record['department']} sampai {record['production_date']}"
-            sentences.append(f"Rata-rata aktual UCI untuk {scope} adalah {summary['mean']:.2%} dari {summary['records']} catatan.")
-            history_ref = EvidenceRef(type="historical_summary", id=f"uci_597:{record['department']}:{record['team_id']}:{record['production_date']}")
+            average = number_id(summary["mean"] * 100)
+            paragraphs.append(
+                f"Dalam data historis UCI sampai {date_label}, rata-rata produktivitas aktual "
+                f"{team} adalah {average}% dari {summary['records']} catatan."
+            )
+            result.evidence.append(EvidenceRef(
+                type="historical_summary", id=f"uci_597:{record['department']}:{record['team_id']}:{record['production_date']}"
+            ))
+            result.status = "answered"
         else:
-            sentences.append("Riwayat UCI untuk tim dan departemen ini belum tersedia.")
-    if any(t in topics for t in ("target", "actual", "cause", "model")):
-        source_id = str(record["prediction_id"])
-        result.evidence = [EvidenceRef(type="prediction", id=source_id)]
-        sentences.append(f"ID prediksi {source_id}.")
-    if history_ref:
-        result.evidence.append(history_ref)
-    if history_ref or "model" in topics or "target" in topics:
+            paragraphs.append(f"Belum ada ringkasan historis UCI untuk {team} sampai {date_label}.")
+    if any(t in topics for t in ("target", "model")):
         result.status = "answered"
-    result.answer = " ".join(sentences)
+    if cites_prediction:
+        paragraphs.append(f"ID prediksi {prediction_id}.")
+    result.answer = "\n\n".join(paragraphs)
     return result

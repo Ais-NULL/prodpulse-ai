@@ -13,16 +13,10 @@ from streamlit.testing.v1 import AppTest
 from shared.contracts import Department
 
 
-def test_streamlit_to_model_history_and_chat(monkeypatch):
-    mongomock = pytest.importorskip("mongomock")
-    from backend.app import database
+def test_streamlit_to_model_history_and_chat(monkeypatch, memory_db):
     from backend.app.main import app
     from frontend.api_client import ApiClient
 
-    memory_db = mongomock.MongoClient()
-    monkeypatch.setattr(database, "client", lambda: memory_db)
-    monkeypatch.setenv("MONGODB_DB_NAME", "integration_test")
-    database.ensure_indexes.cache_clear()
     monkeypatch.setenv("LLM_PROVIDER", "gemini")
     monkeypatch.setenv("LLM_MODEL", "gemini-test")
     monkeypatch.setenv("LLM_API_KEY", "test-only")
@@ -67,10 +61,9 @@ def test_streamlit_to_model_history_and_chat(monkeypatch):
             assert not ui.exception
             reply = ui.session_state["conversations"][result.prediction_id].turns[-1].response
             assert reply.status == "answered" and reply.evidence[0].id == result.prediction_id
-            assert "83.46%" in reply.answer and "3.46 poin persentase di atas" in reply.answer
-            saved = memory_db.integration_test.chat_sessions.find_one({"conversation_id": reply.conversation_id})
+            assert "83,46%" in reply.answer and "3,46 poin persentase di atas" in reply.answer
+            saved = memory_db.chat_sessions.find_one({"conversation_id": reply.conversation_id})
             assert saved["messages"][0]["prediction_id"] == result.prediction_id
         finally:
             server.should_exit = True
             thread.join(timeout=10)
-            database.ensure_indexes.cache_clear()

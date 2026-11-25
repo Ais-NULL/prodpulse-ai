@@ -32,9 +32,40 @@ class TestGeminiAssistant(unittest.TestCase):
         self.assertEqual(json.loads(request.data)["generationConfig"]["responseMimeType"], "application/json")
         self.assertIsInstance(result, ChatResponse)
         self.assertEqual(result.status, "answered")
-        for term in ("74.0%", "80.0%", "6.0 poin persentase", source_id):
+        for term in ("74%", "80%", "6 poin persentase di bawah target", source_id):
             self.assertIn(term, result.answer)
         self.assertEqual(result.evidence[0].id, source_id)
+
+    def test_same_target_and_small_gap_are_distinguished(self):
+        req = ChatRequest(message="Bagaimana targetnya?", prediction_id=source_id)
+        for predicted, gap, expected in [
+            (0.8, 0, "tepat mencapai target 80%"),
+            (0.79999, -0.001, "kurang dari 0,01 poin persentase di bawah target"),
+        ]:
+            with self.subTest(gap=gap):
+                record = {**lookup(source_id), "predicted_productivity": predicted,
+                          "gap_percentage_points": gap,
+                          "target_status": "below_target" if gap < 0 else "meets_or_exceeds_target"}
+                reply = chat(req, get_prediction_by_id=lambda _: record, classify=lambda _: ["target"])
+                self.assertIn(expected, reply.answer)
+                self.assertEqual(reply.evidence[0].id, source_id)
+
+    def test_history_is_distinct_from_estimate(self):
+        result = self.ask(classify=lambda _: ["target", "history"],
+                          get_team_history_summary=lambda _: {"mean": 0.8473, "records": 37})
+        self.assertIn("diperkirakan 74%", result.answer)
+        self.assertIn("rata-rata produktivitas aktual", result.answer)
+        self.assertIn("84,73% dari 37 catatan", result.answer)
+        self.assertEqual([e.type for e in result.evidence], ["prediction", "historical_summary"])
+        self.assertEqual(result.status, "answered")
+
+    def test_missing_history_has_no_invented_average(self):
+        reply = self.ask(classify=lambda _: ["history"],
+                         get_team_history_summary=lambda _: {"mean": None, "records": 0})
+        self.assertIn("Belum ada ringkasan historis", reply.answer)
+        self.assertNotIn("%", reply.answer)
+        self.assertEqual(reply.evidence, [])
+        self.assertEqual(reply.status, "insufficient_data")
 
     def test_unknown_prediction(self):
         provider = Mock()
@@ -50,8 +81,8 @@ class TestGeminiAssistant(unittest.TestCase):
 
     def test_actual_and_cause(self):
         result = self.ask(classify=lambda message: ["actual", "cause"])
-        self.assertIn("Realisasi shift belum tersedia", result.answer)
-        self.assertIn("bukti penyebab", result.answer)
+        self.assertIn("Produktivitas aktual untuk shift tersebut belum tercatat", result.answer)
+        self.assertIn("penyebab selisih dan dampak mengubah rencana kerja belum bisa dipastikan", result.answer)
         self.assertEqual(result.status, "insufficient_data")
 
     @patch.dict(os.environ, {"LLM_API_KEY": "test-only", "LLM_MODEL": "gemini-test", "LLM_PROVIDER": "gemini"})

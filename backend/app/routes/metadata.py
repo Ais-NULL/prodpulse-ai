@@ -2,7 +2,7 @@ from fastapi import APIRouter
 
 from backend.app.database import get_db
 from backend.app.services.prediction_service import active_model
-from shared.contracts import API_PREFIX, Department
+from shared.contracts import API_PREFIX, ActiveModelResponse, Department
 
 router = APIRouter(prefix=API_PREFIX, tags=["metadata"])
 
@@ -17,6 +17,14 @@ def options():
     return {"departments": [d.value for d in Department], "team_ids": team_ids}
 
 
-@router.get("/models/active")
+@router.get("/models/active", response_model=ActiveModelResponse)
 def models_active():
-    return active_model()  # isi metadata.json; 503 kalau model tidak tersedia
+    metadata = active_model()
+    version = metadata["model_version"]
+    metrics = metadata.get("metrics", {}).get(version, {}).get("validation")
+    return ActiveModelResponse(
+        model_version=version,
+        feature_names=metadata["feature_names"],
+        training_cutoff=metadata.get("training_cutoff"),
+        metrics=metrics,
+    )
