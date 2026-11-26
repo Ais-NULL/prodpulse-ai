@@ -533,7 +533,7 @@ pip install -r frontend/nicegui_app/requirements.txt
 ### 2. Atur `.env`
 
 ```powershell
-Copy-Item env.example .env
+cp env.example .env
 ```
 
 Isi nilainya (`.env` **tidak boleh di-commit**):
